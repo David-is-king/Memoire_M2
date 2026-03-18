@@ -1,0 +1,201 @@
+# configs/config.yaml
+
+project:
+  name: predictive_maintenance
+  version: "1.0.0"
+  description: "Predictive maintenance for electric motors - ESP32 sensors"
+
+# ── Paths ─────────────────────────────────────────────────
+paths:
+  data_raw:       data/raw
+  data_processed: data/processed
+  data_features:  data/features
+  models:         models/artifacts
+  registry:       models/registry
+  logs:           logs
+
+# ── Data sources (datasets publics) ───────────────────────
+datasets:
+  cwru:
+    name: "CWRU Bearing Dataset"
+    url: "https://engineering.case.edu/bearingdatacenter"
+    sampling_rate: 12000   # Hz
+    sensors: [vibration_drive_end, vibration_fan_end]
+    fault_types: [normal, ball, inner_race, outer_race]
+
+  nasa_ims:
+    name: "NASA IMS Bearing"
+    url: "https://ti.arc.nasa.gov/tech/dash/groups/pcoe/prognostic-data-repository"
+    sampling_rate: 20480   # Hz
+    sensors: [bearing_1, bearing_2, bearing_3, bearing_4]
+
+  mafaulda:
+    name: "MAFAULDA - Machinery Fault Database"
+    url: "http://www02.smt.ufrj.br/~offshore/mfs/page_01.html"
+    sampling_rate: 50000   # Hz
+    sensors: [vibration_x, vibration_y, vibration_z, acoustic, current]
+
+# ── ESP32 Sensor Config (pour quand les capteurs seront prêts) ──
+esp32:
+  sampling_rate_hz: 100
+  sensors:
+    temperature:
+      pin: 4
+      unit: celsius
+      range: [-10, 200]
+      alert_threshold: 85
+    vibration:
+      pin: 34
+      unit: g            # accéléromètre ADXL345
+      range: [-16, 16]
+      alert_threshold: 5.0
+    current:
+      pin: 35
+      unit: ampere       # capteur ACS712
+      range: [0, 30]
+      alert_threshold: 25
+    voltage:
+      pin: 32
+      unit: volt
+      range: [0, 250]
+    acoustic:
+      pin: 33
+      unit: db           # microphone MAX4466
+      range: [30, 120]
+      alert_threshold: 90
+  mqtt:
+    broker: "localhost"
+    port: 1883
+    topic: "sensors/motor/{motor_id}/readings"
+  websocket:
+    host: "0.0.0.0"
+    port: 8765
+
+# ── Cleaning pipeline ─────────────────────────────────────
+cleaning:
+  level1:   # Raw cleaning
+    drop_duplicates: true
+    timestamp_tolerance_ms: 100
+    physical_bounds:
+      temperature:  [-20, 300]
+      vibration:    [-50, 50]
+      current:      [-5, 100]
+      voltage:      [0, 500]
+      acoustic_db:  [0, 140]
+    null_strategy: flag    # flag | drop | interpolate
+
+  level2:   # Structural
+    resample_hz: 100       # uniformiser à 100 Hz
+    interpolation_method: linear
+    max_gap_seconds: 5     # ne pas interpoler les gaps > 5s
+    align_tolerance_ms: 50
+
+  level3:   # Feature engineering
+    window_sizes: [128, 256, 512, 1024]   # échantillons
+    overlap: 0.5
+    fft_bins: 512
+
+# ── Feature Engineering ───────────────────────────────────
+features:
+  time_domain:
+    - rms
+    - peak_to_peak
+    - kurtosis
+    - skewness
+    - crest_factor
+    - shape_factor
+    - impulse_factor
+    - mean
+    - std
+    - variance
+    - zero_crossing_rate
+
+  frequency_domain:
+    - dominant_frequency
+    - spectral_centroid
+    - spectral_rolloff
+    - spectral_flux
+    - band_power_0_500hz
+    - band_power_500_2000hz
+    - band_power_2000_5000hz
+    - thd                  # Total Harmonic Distortion (courant)
+
+  cross_sensor:
+    - temp_delta_60s
+    - temp_delta_300s
+    - vibration_current_correlation
+    - snr_acoustic
+
+  rolling_stats:
+    windows_seconds: [10, 60, 300]
+    stats: [mean, std, max, min]
+
+# ── Models ────────────────────────────────────────────────
+models:
+  anomaly_detection:
+    name: isolation_forest
+    params:
+      n_estimators: 200
+      contamination: 0.05
+      max_samples: auto
+      random_state: 42
+
+  classification:
+    name: random_forest
+    params:
+      n_estimators: 300
+      max_depth: 20
+      min_samples_split: 5
+      class_weight: balanced
+      random_state: 42
+      n_jobs: -1
+
+  rul_prediction:
+    name: lstm
+    params:
+      sequence_length: 50
+      hidden_size: 128
+      num_layers: 2
+      dropout: 0.2
+      learning_rate: 0.001
+      batch_size: 64
+      epochs: 100
+      patience: 15
+
+  ensemble:
+    voting: soft
+    weights: [0.2, 0.4, 0.4]   # [isolation_forest, random_forest, lstm]
+
+# ── Training ──────────────────────────────────────────────
+training:
+  test_size: 0.2
+  val_size: 0.1
+  cv_folds: 5
+  stratify: true
+  random_state: 42
+  mlflow:
+    tracking_uri: "http://localhost:5000"
+    experiment_name: "predictive_maintenance"
+
+# ── Thresholds (classification finale) ───────────────────
+thresholds:
+  healthy:  { max_failure_prob: 0.30, min_health_score: 70 }
+  warning:  { max_failure_prob: 0.65, min_health_score: 40 }
+  critical: { failure_prob_min: 0.65 }
+
+# ── API ───────────────────────────────────────────────────
+api:
+  host: "0.0.0.0"
+  port: 8000
+  workers: 4
+  reload: false
+
+# ── Monitoring / Auto-retrain ──────────────────────────────
+monitoring:
+  drift_detection: true
+  drift_threshold: 0.15     # PSI > 0.15 → drift significatif
+  auto_retrain: true
+  retrain_trigger:
+    min_new_samples: 1000
+    f1_drop_threshold: 0.05  # si F1 baisse de 5% → retrain
+  alert_channels: [api, websocket]
