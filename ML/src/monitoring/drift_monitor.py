@@ -62,10 +62,13 @@ class DriftMonitor:
         for col in numeric_cols:
             if col in ("label", "rul"):
                 continue
-            series = df[col].dropna()
-            if len(series) < 10:
+            series = df[col].replace([np.inf, -np.inf], np.nan).dropna()
+            if len(series) < 10 or series.nunique() < 2:
                 continue
-            hist, bin_edges = np.histogram(series, bins=self.N_BINS)
+            try:
+                hist, bin_edges = np.histogram(series, bins=self.N_BINS)
+            except ValueError:
+                continue
             self._reference_stats[col] = {
                 "hist":      hist,
                 "bin_edges": bin_edges,

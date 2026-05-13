@@ -44,7 +44,13 @@ def setup_logging():
 # ÉTAPE 1 : INGESTION
 # ─────────────────────────────────────────────────────────
 
-def step_ingest(use_synthetic: bool = True, n_motors: int = 15) -> "pd.DataFrame":
+def step_ingest(
+    use_synthetic: bool = True,
+    n_motors: int = 15,
+    duration_hours: int = 1,
+    sampling_rate_hz: int = 10,
+    include_public_datasets: bool = False,
+) -> "pd.DataFrame":
     import pandas as pd
     logger.info("━" * 60)
     logger.info("STEP 1 — DATA INGESTION")
@@ -54,9 +60,21 @@ def step_ingest(use_synthetic: bool = True, n_motors: int = 15) -> "pd.DataFrame
 
     if use_synthetic:
         # Données synthétiques complètes (tous capteurs ESP32)
-        df_synth = loader.generate_synthetic(n_motors=n_motors, duration_hours=300, fault_rate=0.20)
+        df_synth = loader.generate_synthetic(
+            n_motors=n_motors,
+            duration_hours=duration_hours,
+            fault_rate=0.20,
+            sampling_rate_hz=sampling_rate_hz,
+        )
         dfs.append(df_synth)
         logger.info(f"  Synthetic: {len(df_synth):,} rows")
+
+    if not include_public_datasets:
+        combined = pd.concat(dfs, ignore_index=True)
+        Path("data/raw").mkdir(parents=True, exist_ok=True)
+        combined.to_parquet("data/raw/combined_raw.parquet", index=False)
+        logger.info(f"  Synthetic-only total: {len(combined):,} rows - {combined['motor_id'].nunique()} motors")
+        return combined
 
     # Essayer de charger les datasets publics (fallback sur synthétique si absent)
     try:
@@ -74,6 +92,7 @@ def step_ingest(use_synthetic: bool = True, n_motors: int = 15) -> "pd.DataFrame
         logger.warning(f"  NASA IMS load failed: {e}")
 
     combined = pd.concat(dfs, ignore_index=True)
+    Path("data/raw").mkdir(parents=True, exist_ok=True)
     combined.to_parquet("data/raw/combined_raw.parquet", index=False)
     logger.info(f"  ✓ Total: {len(combined):,} rows — {combined['motor_id'].nunique()} motors")
     return combined
@@ -83,15 +102,18 @@ def step_ingest(use_synthetic: bool = True, n_motors: int = 15) -> "pd.DataFrame
 # ÉTAPE 2 : CLEANING
 # ─────────────────────────────────────────────────────────
 
-def step_clean(raw_df) -> "pd.DataFrame":
+def step_clean(raw_df, resample_hz: int = 10) -> "pd.DataFrame":
     logger.info("━" * 60)
     logger.info("STEP 2 — CLEANING PIPELINE (3 levels)")
 
     pipeline = CleaningPipeline(config={
         "level1": {"null_strategy": "flag"},
-        "level2": {"resample_hz": 100, "max_gap_seconds": 5.0},
+        "level2": {"resample_hz": resample_hz, "max_gap_seconds": 5.0},
         "level3": {"window_size": 512, "overlap": 0.5},
     })
+
+    Path("data/processed").mkdir(parents=True, exist_ok=True)
+    Path("data/features").mkdir(parents=True, exist_ok=True)
 
     features_df, reports = pipeline.run(
         raw_df,
@@ -218,6 +240,9 @@ def main():
     parser.add_argument("--tune",    action="store_true", help="Optuna hyperparameter tuning")
     parser.add_argument("--motors",  type=int, default=15, help="Number of synthetic motors")
     parser.add_argument("--speedup", type=float, default=50.0, help="Simulator speedup factor")
+    parser.add_argument("--duration-hours", type=int, default=1, help="Synthetic data duration per motor")
+    parser.add_argument("--sample-rate", type=int, default=10, help="Synthetic data sampling rate in Hz")
+    parser.add_argument("--include-public-datasets", action="store_true", help="Also load CWRU/NASA datasets")
     args = parser.parse_args()
 
     logger.info("╔══════════════════════════════════════════════╗")
@@ -227,8 +252,14 @@ def main():
     logger.info("╚══════════════════════════════════════════════╝\n")
 
     if args.mode in ("train", "full"):
-        raw_df      = step_ingest(use_synthetic=True, n_motors=args.motors)
-        features_df = step_clean(raw_df)
+        raw_df      = step_ingest(
+            use_synthetic=True,
+            n_motors=args.motors,
+            duration_hours=args.duration_hours,
+            sampling_rate_hz=args.sample_rate,
+            include_public_datasets=args.include_public_datasets,
+        )
+        features_df = step_clean(raw_df, resample_hz=args.sample_rate)
         metrics     = step_train(features_df, tune=args.tune)
         step_setup_monitoring(features_df)
 

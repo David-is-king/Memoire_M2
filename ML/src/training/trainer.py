@@ -21,9 +21,6 @@ from pathlib import Path
 from typing import Optional
 from loguru import logger
 
-import mlflow
-import mlflow.sklearn
-import mlflow.pytorch
 import optuna
 from optuna.samplers import TPESampler
 
@@ -35,6 +32,8 @@ from sklearn.metrics import (
     roc_auc_score, mean_absolute_error
 )
 from sklearn.pipeline import Pipeline as SKPipeline
+
+mlflow = None
 
 
 # ═══════════════════════════════════════════════════════════
@@ -104,11 +103,16 @@ class PredictiveMaintenanceTrainer:
 
         # MLflow
         try:
+            global mlflow
+            import mlflow as _mlflow
+            import mlflow.sklearn
+            import mlflow.pytorch
+            mlflow = _mlflow
             mlflow.set_tracking_uri(mlflow_uri)
             mlflow.set_experiment(experiment_name)
             self.mlflow_enabled = True
-        except Exception:
-            logger.warning("MLflow not available — training without tracking")
+        except Exception as e:
+            logger.warning(f"MLflow not available - training without tracking ({e})")
             self.mlflow_enabled = False
 
         # Artifacts
@@ -294,7 +298,16 @@ class PredictiveMaintenanceTrainer:
         ).sort_values(ascending=False)
         top_features = importance.head(20).to_dict()
 
-        logger.info(f"\n  Classification Report:\n{classification_report(y_test, y_pred, target_names=['Normal','Warning','Critical'])}")
+        logger.info(
+            "\n  Classification Report:\n"
+            + classification_report(
+                y_test,
+                y_pred,
+                labels=[0, 1, 2],
+                target_names=["Normal", "Warning", "Critical"],
+                zero_division=0,
+            )
+        )
 
         if self.mlflow_enabled:
             mlflow.log_params({f"rf_{k}": v for k, v in params.items()})
@@ -348,7 +361,7 @@ class PredictiveMaintenanceTrainer:
         X_seq_train, y_seq_train = self._make_sequences(X_train, y_rul_train, sequence_length)
         X_seq_test,  y_seq_test  = self._make_sequences(X_test,  y_rul_test,  sequence_length)
 
-        if len(X_seq_train) == 0:
+        if len(X_seq_train) == 0 or len(X_seq_test) == 0:
             logger.warning("  Not enough data for LSTM sequences — skipping LSTM training")
             return {"mae": 999, "rmse": 999, "params": hp}
 
@@ -507,20 +520,20 @@ class PredictiveMaintenanceTrainer:
 
     @staticmethod
     def _print_summary(metrics: dict):
-        print("\n┌─────────────────────────────────────────┐")
-        print("│           TRAINING SUMMARY               │")
-        print("├─────────────────────────────────────────┤")
+        print("\n+-----------------------------------------+")
+        print("|           TRAINING SUMMARY              |")
+        print("+-----------------------------------------+")
         if "isolation_forest" in metrics:
-            print(f"│  Isolation Forest  F1:  {metrics['isolation_forest'].get('f1', 0):.3f}            │")
+            print(f"|  Isolation Forest  F1:  {metrics['isolation_forest'].get('f1', 0):.3f}           |")
         if "random_forest" in metrics:
             rf = metrics["random_forest"]
-            print(f"│  Random Forest     F1:  {rf['f1_macro']:.3f}  AUC: {rf['auc']:.3f}   │")
+            print(f"|  Random Forest     F1:  {rf['f1_macro']:.3f}  AUC: {rf['auc']:.3f}  |")
         if "lstm" in metrics:
             lstm = metrics["lstm"]
-            print(f"│  LSTM              MAE: {lstm['mae']:.1f}d  RMSE: {lstm['rmse']:.1f}d  │")
+            print(f"|  LSTM              MAE: {lstm['mae']:.1f}d  RMSE: {lstm['rmse']:.1f}d |")
         if "ensemble" in metrics:
-            print(f"│  Ensemble          F1:  {metrics['ensemble'].get('f1_macro', 0):.3f}            │")
-        print("└─────────────────────────────────────────┘")
+            print(f"|  Ensemble          F1:  {metrics['ensemble'].get('f1_macro', 0):.3f}           |")
+        print("+-----------------------------------------+")
 
 
 class _NullContext:

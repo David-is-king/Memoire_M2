@@ -20,7 +20,7 @@ from dataclasses import dataclass, field
 class CleaningReport:
     level: int
     input_rows: int
-    output_rows: int
+    output_rows: int = 0
     dropped_rows: int = 0
     flagged_rows: int = 0
     interpolated_points: int = 0

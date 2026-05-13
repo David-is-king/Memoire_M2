@@ -3,6 +3,9 @@ ML/data/raw/
 ML/data/raw/**
 ML/data/raw/cwru/
 ML/data/raw/mafaulda/
+ML/data/processed/
+ML/data/features/
+ML/logs/
 
 # archives
 *.zip

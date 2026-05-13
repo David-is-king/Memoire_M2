@@ -147,6 +147,7 @@ class DatasetLoader:
         n_motors: int = 10,
         duration_hours: int = 500,
         fault_rate: float = 0.15,
+        sampling_rate_hz: int = 100,
     ) -> pd.DataFrame:
         """
         Génère des données synthétiques réalistes pour tous les capteurs ESP32.
@@ -166,6 +167,7 @@ class DatasetLoader:
                 duration_hours=duration_hours,
                 will_fail=will_fail,
                 fault_type=fault_type,
+                sr_hz=sampling_rate_hz,
             )
             dfs.append(df)
             logger.debug(f"  {motor_id}: {'FAIL→' + fault_type:20s} {len(df):,} pts")
