@@ -1,5 +1,6 @@
 // ─────────────────────────────────────────────
 // screens/dashboard_screen.dart
+// Ecran 2 : Accueil / Tableau de bord
 // ─────────────────────────────────────────────
 
 import 'dart:async';
@@ -9,7 +10,7 @@ import 'api_service.dart';
 import 'websocket_service.dart';
 import 'notification_service.dart';
 import 'app_theme.dart';
-import 'sensor_card.dart';
+import 'status_badge.dart';
 import 'motor_detail_screen.dart';
 import 'alerts_screen.dart';
 
@@ -41,7 +42,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
     _notif.initialize();
     _loadData();
     _connectWebSocket();
-    // Refresh toutes les 30s
     _refreshTimer = Timer.periodic(
       const Duration(seconds: 30),
       (_) => _loadData(),
@@ -55,7 +55,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
       if (mounted) {
         setState(() {
           _motors = motors;
-          _recentAlerts = alerts.take(5).toList();
+          _recentAlerts = alerts.take(4).toList();
           _unreadCount = alerts.where((a) => !a.isRead).length;
           _loading = false;
           _error = null;
@@ -78,7 +78,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
       _notif.showAlertNotification(alert);
       setState(() {
         _recentAlerts.insert(0, alert);
-        if (_recentAlerts.length > 5) _recentAlerts.removeLast();
+        if (_recentAlerts.length > 4) _recentAlerts.removeLast();
         if (!alert.isRead) _unreadCount++;
       });
     });
@@ -113,26 +113,28 @@ class _DashboardScreenState extends State<DashboardScreen> {
     super.dispose();
   }
 
-  // ── Stats globales ───────────────────────────
-
-  int get _healthyCount =>
-      _motors.where((m) => m.status == MotorStatus.healthy).length;
-  int get _warningCount =>
-      _motors.where((m) => m.status == MotorStatus.warning).length;
   int get _criticalCount =>
       _motors.where((m) => m.status == MotorStatus.critical).length;
+  int get _warningCount =>
+      _motors.where((m) => m.status == MotorStatus.warning).length;
+  int get _healthyCount =>
+      _motors.where((m) => m.status == MotorStatus.healthy).length;
+  int get _maintenanceCount =>
+      _motors.where((m) => m.status == MotorStatus.offline).length;
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppTheme.background,
       body: SafeArea(
+        bottom: false,
         child: Column(
           children: [
             _buildHeader(),
             Expanded(
               child: _loading
-                  ? _buildLoader()
+                  ? const Center(
+                      child: CircularProgressIndicator(color: AppTheme.primary))
                   : _error != null
                       ? _buildError()
                       : _buildContent(),
@@ -143,353 +145,165 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
-  // ── Header ───────────────────────────────────
+  // ── Header bleu marine ───────────────────────
 
   Widget _buildHeader() {
     return Container(
-      padding: const EdgeInsets.fromLTRB(20, 16, 20, 16),
+      padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
       decoration: const BoxDecoration(
-        border: Border(bottom: BorderSide(color: AppTheme.border)),
+        color: AppTheme.headerBg,
+        borderRadius: BorderRadius.only(
+          bottomLeft: Radius.circular(24),
+          bottomRight: Radius.circular(24),
+        ),
       ),
-      child: Row(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Logo / Titre
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+          Row(
             children: [
-              Text(
-                'smartpredict',
-                style: AppTextStyles.labelMono.copyWith(
-                  color: AppTheme.primary,
-                  letterSpacing: 4,
-                  fontSize: 10,
+              const Icon(Icons.menu_rounded, color: Colors.white),
+              const SizedBox(width: 12),
+              const CircleAvatar(
+                radius: 18,
+                backgroundColor: Colors.white24,
+                child: Icon(Icons.person, color: Colors.white, size: 20),
+              ),
+              const SizedBox(width: 10),
+              const Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('Bonjour, Julien',
+                        style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 15,
+                            fontWeight: FontWeight.w600)),
+                    Text('Technicien',
+                        style: TextStyle(color: Colors.white70, fontSize: 11)),
+                  ],
                 ),
               ),
-              const Text('MAINTENANCE', style: AppTextStyles.headingMedium),
-            ],
-          ),
-          const Spacer(),
-          // Statut WS
-          StreamBuilder<WsConnectionState>(
-            stream: _ws.connectionState,
-            builder: (_, snap) {
-              final connected =
-                  snap.data == WsConnectionState.connected;
-              return Row(
-                children: [
-                  Container(
-                    width: 6,
-                    height: 6,
-                    decoration: BoxDecoration(
-                      color: connected
-                          ? AppTheme.accent
-                          : AppTheme.textMuted,
-                      shape: BoxShape.circle,
-                    ),
-                  ),
-                  const SizedBox(width: 6),
-                  Text(
-                    connected ? 'LIVE' : 'OFFLINE',
-                    style: AppTextStyles.labelMono.copyWith(fontSize: 9),
-                  ),
-                ],
-              );
-            },
-          ),
-          const SizedBox(width: 16),
-          // Cloche alertes
-          GestureDetector(
-            onTap: () => Navigator.push(
-              context,
-              MaterialPageRoute(builder: (_) => const AlertsScreen()),
-            ),
-            child: Stack(
-              children: [
-                const Icon(Icons.notifications_none_rounded,
-                    color: AppTheme.textSecondary),
-                if (_unreadCount > 0)
-                  Positioned(
-                    top: 0,
-                    right: 0,
-                    child: Container(
-                      width: 14,
-                      height: 14,
-                      decoration: const BoxDecoration(
-                        color: AppTheme.danger,
-                        shape: BoxShape.circle,
-                      ),
-                      child: Center(
-                        child: Text(
-                          _unreadCount > 9 ? '9+' : '$_unreadCount',
-                          style: const TextStyle(
-                            fontSize: 8,
-                            color: Colors.white,
-                            fontWeight: FontWeight.w700,
+              GestureDetector(
+                onTap: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const AlertsScreen()),
+                ),
+                child: Stack(
+                  children: [
+                    const Icon(Icons.notifications_none_rounded,
+                        color: Colors.white),
+                    if (_unreadCount > 0)
+                      Positioned(
+                        right: 0,
+                        top: 0,
+                        child: Container(
+                          padding: const EdgeInsets.all(3),
+                          decoration: const BoxDecoration(
+                            color: AppTheme.danger,
+                            shape: BoxShape.circle,
+                          ),
+                          constraints: const BoxConstraints(minWidth: 16, minHeight: 16),
+                          child: Text(
+                            _unreadCount > 9 ? '9+' : '$_unreadCount',
+                            textAlign: TextAlign.center,
+                            style: const TextStyle(
+                              fontSize: 8,
+                              color: Colors.white,
+                              fontWeight: FontWeight.w700,
+                            ),
                           ),
                         ),
                       ),
-                    ),
-                  ),
-              ],
-            ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 22),
+          const Text('Aperçu',
+              style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 15,
+                  fontWeight: FontWeight.w600)),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              _OverviewCard(value: '$_criticalCount', label: 'Alertes\ncritiques', color: AppTheme.danger),
+              const SizedBox(width: 10),
+              _OverviewCard(value: '$_warningCount', label: 'Alertes\nmajeures', color: AppTheme.warning),
+              const SizedBox(width: 10),
+              _OverviewCard(value: '$_healthyCount', label: 'Machines\nOK', color: AppTheme.success),
+              const SizedBox(width: 10),
+              _OverviewCard(value: '$_maintenanceCount', label: 'En\nmaintenance', color: Colors.white),
+            ],
           ),
         ],
       ),
     );
   }
 
-  // ── Stats bar ────────────────────────────────
-
-  Widget _buildStatsBar() {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
-      child: Row(
-        children: [
-          _StatChip(
-            value: '${_motors.length}',
-            label: 'MOTEURS',
-            color: AppTheme.textSecondary,
-          ),
-          const SizedBox(width: 12),
-          _StatChip(
-            value: '$_healthyCount',
-            label: 'OK',
-            color: AppTheme.accent,
-          ),
-          const SizedBox(width: 12),
-          _StatChip(
-            value: '$_warningCount',
-            label: 'ALERTE',
-            color: AppTheme.warning,
-          ),
-          const SizedBox(width: 12),
-          _StatChip(
-            value: '$_criticalCount',
-            label: 'CRITIQUE',
-            color: AppTheme.danger,
-          ),
-        ],
-      ),
-    );
-  }
-
-  // ── Content ──────────────────────────────────
+  // ── Contenu ──────────────────────────────────
 
   Widget _buildContent() {
     return RefreshIndicator(
       onRefresh: _loadData,
       color: AppTheme.primary,
-      backgroundColor: AppTheme.surfaceElevated,
       child: ListView(
-        padding: const EdgeInsets.only(bottom: 32),
+        padding: const EdgeInsets.fromLTRB(20, 20, 20, 32),
         children: [
-          _buildStatsBar(),
-          const SizedBox(height: 24),
-          // Section critiques en premier
-          if (_criticalCount > 0) ...[
-            _SectionHeader(
-              label: 'CRITIQUE',
-              count: _criticalCount,
-              color: AppTheme.danger,
-            ),
-            ..._motors
-                .where((m) => m.status == MotorStatus.critical)
-                .map(_buildMotorCard),
-            const SizedBox(height: 8),
-          ],
-          if (_warningCount > 0) ...[
-            _SectionHeader(
-              label: 'ATTENTION',
-              count: _warningCount,
-              color: AppTheme.warning,
-            ),
-            ..._motors
-                .where((m) => m.status == MotorStatus.warning)
-                .map(_buildMotorCard),
-            const SizedBox(height: 8),
-          ],
-          _SectionHeader(
-            label: 'TOUS LES MOTEURS',
-            count: _motors.length,
-            color: AppTheme.textSecondary,
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Text('Machines', style: AppTextStyles.headingMedium),
+              TextButton(
+                onPressed: () {},
+                child: const Text('Voir tout',
+                    style: TextStyle(color: AppTheme.primary, fontSize: 13)),
+              ),
+            ],
           ),
-          ..._motors.map(_buildMotorCard),
+          const SizedBox(height: 8),
+          ..._motors.take(4).map(_buildMachineRow),
         ],
       ),
     );
   }
 
-  // ── Motor Card ───────────────────────────────
-
-  Widget _buildMotorCard(MotorDevice motor) {
-    final isCritical = motor.status == MotorStatus.critical;
-    final isWarning = motor.status == MotorStatus.warning;
-
+  Widget _buildMachineRow(MotorDevice motor) {
     return GestureDetector(
       onTap: () => Navigator.push(
         context,
-        MaterialPageRoute(
-          builder: (_) => MotorDetailScreen(motorId: motor.id),
-        ),
+        MaterialPageRoute(builder: (_) => MotorDetailScreen(motorId: motor.id)),
       ),
       child: Container(
-        margin: const EdgeInsets.fromLTRB(20, 0, 20, 12),
-        padding: const EdgeInsets.all(16),
+        margin: const EdgeInsets.only(bottom: 10),
+        padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
-          color: isCritical
-              ? AppTheme.dangerDim
-              : isWarning
-                  ? AppTheme.warningDim
-                  : AppTheme.surface,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(
-            color: isCritical
-                ? AppTheme.danger.withValues(alpha: 0.4)
-                : isWarning
-                    ? AppTheme.warning.withValues(alpha: 0.4)
-                    : AppTheme.border,
-          ),
+          color: AppTheme.surface,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: AppTheme.border),
         ),
-        child: Column(
+        child: Row(
           children: [
-            Row(
-              children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(motor.name, style: AppTextStyles.headingMedium),
-                      const SizedBox(height: 2),
-                      Text(
-                        motor.location.toUpperCase(),
-                        style: AppTextStyles.labelMono,
-                      ),
-                    ],
-                  ),
-                ),
-                StatusBadge(status: motor.status),
-              ],
-            ),
-            const SizedBox(height: 16),
-            Row(
-              children: [
-                // Health
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'SANTÉ',
-                        style: AppTextStyles.labelMono.copyWith(fontSize: 9),
-                      ),
-                      const SizedBox(height: 4),
-                      ClipRRect(
-                        borderRadius: BorderRadius.circular(2),
-                        child: LinearProgressIndicator(
-                          value: motor.healthScore,
-                          backgroundColor: AppTheme.border,
-                          valueColor: AlwaysStoppedAnimation(
-                            motor.healthScore >= 0.75
-                                ? AppTheme.accent
-                                : motor.healthScore >= 0.50
-                                    ? AppTheme.warning
-                                    : AppTheme.danger,
-                          ),
-                          minHeight: 4,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        '${(motor.healthScore * 100).toInt()}%',
-                        style: AppTextStyles.labelMono.copyWith(
-                          color: AppTheme.textPrimary,
-                          fontSize: 10,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(width: 20),
-                // Failure prob
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  children: [
-                    Text(
-                      'RISQUE PANNE',
-                      style: AppTextStyles.labelMono.copyWith(fontSize: 9),
-                    ),
-                    Text(
-                      '${(motor.failureProbability * 100).toInt()}%',
-                      style: AppTextStyles.valueSmall.copyWith(
-                        color: motor.failureProbability > 0.7
-                            ? AppTheme.danger
-                            : motor.failureProbability > 0.4
-                                ? AppTheme.warning
-                                : AppTheme.accent,
-                        fontSize: 22,
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(width: 20),
-                // RUL
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  children: [
-                    Text(
-                      'RUL',
-                      style: AppTextStyles.labelMono.copyWith(fontSize: 9),
-                    ),
-                    Text(
-                      '${motor.estimatedRulDays}j',
-                      style: AppTextStyles.valueSmall.copyWith(fontSize: 22),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-            if (motor.lastReading != null) ...[
-              const SizedBox(height: 12),
-              const Divider(color: AppTheme.border, height: 1),
-              const SizedBox(height: 12),
-              Row(
+            MachineIcon(machineName: motor.name),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  _MiniStat(
-                    icon: Icons.thermostat_rounded,
-                    value:
-                        '${motor.lastReading!.temperature.toStringAsFixed(1)}°C',
-                    alert: motor.lastReading!.temperature > 85,
-                  ),
-                  _MiniStat(
-                    icon: Icons.vibration_rounded,
-                    value:
-                        '${motor.lastReading!.vibrationRms.toStringAsFixed(2)} m/s²',
-                    alert: motor.lastReading!.vibrationRms > 5,
-                  ),
-                  _MiniStat(
-                    icon: Icons.electric_bolt_rounded,
-                    value:
-                        '${motor.lastReading!.current.toStringAsFixed(1)} A',
-                    alert: false,
-                  ),
-                  _MiniStat(
-                    icon: Icons.graphic_eq_rounded,
-                    value:
-                        '${motor.lastReading!.acousticDb.toStringAsFixed(0)} dB',
-                    alert: motor.lastReading!.acousticDb > 85,
-                  ),
+                  Text(motor.name, style: AppTextStyles.headingSmall),
+                  const SizedBox(height: 2),
+                  Text(motor.location, style: AppTextStyles.labelMono),
                 ],
               ),
-            ],
+            ),
+            StatusBadge(status: motor.status),
           ],
         ),
       ),
     );
   }
-
-  Widget _buildLoader() => const Center(
-        child: CircularProgressIndicator(color: AppTheme.primary),
-      );
 
   Widget _buildError() => Center(
         child: Column(
@@ -497,141 +311,65 @@ class _DashboardScreenState extends State<DashboardScreen> {
           children: [
             const Icon(Icons.error_outline, color: AppTheme.danger, size: 48),
             const SizedBox(height: 16),
-            Text('Connexion impossible', style: AppTextStyles.headingMedium),
+            const Text('Connexion impossible', style: AppTextStyles.headingMedium),
             const SizedBox(height: 8),
             Text(_error ?? '', style: AppTextStyles.labelMono),
             const SizedBox(height: 24),
             ElevatedButton(
               onPressed: _loadData,
               style: ElevatedButton.styleFrom(
-                backgroundColor: AppTheme.primaryDim,
-                foregroundColor: AppTheme.primary,
+                backgroundColor: AppTheme.primary,
+                foregroundColor: Colors.white,
               ),
-              child: const Text('RÉESSAYER'),
+              child: const Text('Réessayer'),
             ),
           ],
         ),
       );
 }
 
-// ── Sous-widgets ─────────────────────────────
-
-class _StatChip extends StatelessWidget {
+class _OverviewCard extends StatelessWidget {
   final String value;
   final String label;
   final Color color;
 
-  const _StatChip({
+  const _OverviewCard({
     required this.value,
     required this.label,
     required this.color,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.08),
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: color.withValues(alpha: 0.2)),
-      ),
-      child: Column(
-        children: [
-          Text(
-            value,
-            style: TextStyle(
-              fontSize: 20,
-              fontWeight: FontWeight.w800,
-              color: color,
-              fontFamily: 'Courier',
-            ),
-          ),
-          Text(
-            label,
-            style: AppTextStyles.labelMono.copyWith(fontSize: 8),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _SectionHeader extends StatelessWidget {
-  final String label;
-  final int count;
-  final Color color;
-
-  const _SectionHeader({
-    required this.label,
-    required this.count,
-    required this.color,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 8, 20, 12),
-      child: Row(
-        children: [
-          Text(
-            label,
-            style: AppTextStyles.labelMono.copyWith(color: color),
-          ),
-          const SizedBox(width: 8),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
-            decoration: BoxDecoration(
-              color: color.withValues(alpha: 0.15),
-              borderRadius: BorderRadius.circular(3),
-            ),
-            child: Text(
-              '$count',
-              style: AppTextStyles.labelMono.copyWith(
-                color: color,
-                fontSize: 9,
-              ),
-            ),
-          ),
-          const SizedBox(width: 12),
-          Expanded(child: Divider(color: color.withValues(alpha: 0.2))),
-        ],
-      ),
-    );
-  }
-}
-
-class _MiniStat extends StatelessWidget {
-  final IconData icon;
-  final String value;
-  final bool alert;
-
-  const _MiniStat({
-    required this.icon,
-    required this.value,
-    required this.alert,
   });
 
   @override
   Widget build(BuildContext context) {
     return Expanded(
-      child: Row(
-        children: [
-          Icon(icon,
-              size: 12,
-              color: alert ? AppTheme.danger : AppTheme.textMuted),
-          const SizedBox(width: 3),
-          Flexible(
-            child: Text(
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 6),
+        decoration: BoxDecoration(
+          color: Colors.white.withValues(alpha: 0.08),
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Column(
+          children: [
+            Text(
               value,
-              style: AppTextStyles.labelMono.copyWith(
-                fontSize: 9,
-                color: alert ? AppTheme.danger : AppTheme.textSecondary,
+              style: TextStyle(
+                fontSize: 22,
+                fontWeight: FontWeight.w800,
+                color: color,
               ),
-              overflow: TextOverflow.ellipsis,
             ),
-          ),
-        ],
+            const SizedBox(height: 4),
+            Text(
+              label,
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                fontSize: 9,
+                color: Colors.white70,
+                height: 1.2,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

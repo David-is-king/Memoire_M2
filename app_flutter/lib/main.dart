@@ -10,12 +10,12 @@ import 'login_screen.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Barre de statut transparente (iOS + Android)
   SystemChrome.setSystemUIOverlayStyle(
-    SystemUiOverlayStyle(
+    const SystemUiOverlayStyle(
       statusBarColor: Colors.transparent,
       statusBarIconBrightness: Brightness.light,
-      systemNavigationBarColor: AppTheme.background,
+      systemNavigationBarColor: AppTheme.surface,
+      systemNavigationBarIconBrightness: Brightness.dark,
     ),
   );
 
@@ -28,9 +28,9 @@ class PredictiveMaintenanceApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Predictive Maintenance',
+      title: 'SmartPredict',
       debugShowCheckedModeBanner: false,
-      theme: AppTheme.darkTheme,
+      theme: AppTheme.lightTheme,
       home: const LoginScreen(),
     );
   }

@@ -45,10 +45,7 @@ class RealtimeChart extends StatelessWidget {
       children: [
         Row(
           children: [
-            Text(
-              label.toUpperCase(),
-              style: AppTextStyles.labelMono,
-            ),
+            Text(label.toUpperCase(), style: AppTextStyles.labelMono),
             const Spacer(),
             if (dataPoints.isNotEmpty)
               Text(
@@ -56,6 +53,7 @@ class RealtimeChart extends StatelessWidget {
                 style: AppTextStyles.labelMono.copyWith(
                   color: color,
                   fontSize: 10,
+                  fontWeight: FontWeight.w700,
                 ),
               ),
           ],
@@ -65,10 +63,7 @@ class RealtimeChart extends StatelessWidget {
           height: height,
           child: spots.length < 2
               ? Center(
-                  child: Text(
-                    'EN ATTENTE DE DONNÉES...',
-                    style: AppTextStyles.labelMono,
-                  ),
+                  child: Text('En attente de données...', style: AppTextStyles.labelMono),
                 )
               : LineChart(
                   LineChartData(
@@ -88,21 +83,13 @@ class RealtimeChart extends StatelessWidget {
                           reservedSize: 32,
                           getTitlesWidget: (v, _) => Text(
                             v.toInt().toString(),
-                            style: AppTextStyles.labelMono.copyWith(
-                              fontSize: 8,
-                            ),
+                            style: AppTextStyles.labelMono.copyWith(fontSize: 8),
                           ),
                         ),
                       ),
-                      rightTitles: const AxisTitles(
-                        sideTitles: SideTitles(showTitles: false),
-                      ),
-                      topTitles: const AxisTitles(
-                        sideTitles: SideTitles(showTitles: false),
-                      ),
-                      bottomTitles: const AxisTitles(
-                        sideTitles: SideTitles(showTitles: false),
-                      ),
+                      rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                      topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                      bottomTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
                     ),
                     borderData: FlBorderData(show: false),
                     minY: minY,
@@ -113,7 +100,7 @@ class RealtimeChart extends StatelessWidget {
                         isCurved: true,
                         curveSmoothness: 0.3,
                         color: color,
-                        barWidth: 1.5,
+                        barWidth: 2,
                         isStrokeCapRound: true,
                         dotData: const FlDotData(show: false),
                         belowBarData: BarAreaData(
@@ -122,7 +109,7 @@ class RealtimeChart extends StatelessWidget {
                             begin: Alignment.topCenter,
                             end: Alignment.bottomCenter,
                             colors: [
-                              color.withValues(alpha: 0.2),
+                              color.withValues(alpha: 0.18),
                               color.withValues(alpha: 0.0),
                             ],
                           ),

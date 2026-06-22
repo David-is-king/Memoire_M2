@@ -1,10 +1,9 @@
 // ─────────────────────────────────────────────
-// widgets/sensor_card.dart
+// widgets/sensor_card.dart + health_gauge.dart
 // ─────────────────────────────────────────────
 
 import 'package:flutter/material.dart';
 import 'app_theme.dart';
-import 'sensor_data.dart';
 
 class SensorCard extends StatelessWidget {
   final String label;
@@ -28,16 +27,13 @@ class SensorCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final color = valueColor ?? AppTheme.primary;
 
-    return AnimatedContainer(
-      duration: const Duration(milliseconds: 300),
-      padding: const EdgeInsets.all(16),
+    return Container(
+      padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: isAlert
-            ? AppTheme.dangerDim
-            : AppTheme.surfaceElevated,
-        borderRadius: BorderRadius.circular(12),
+        color: isAlert ? AppTheme.dangerBg : AppTheme.surface,
+        borderRadius: BorderRadius.circular(14),
         border: Border.all(
-          color: isAlert ? AppTheme.danger : AppTheme.border,
+          color: isAlert ? AppTheme.danger.withValues(alpha: 0.4) : AppTheme.border,
           width: isAlert ? 1.5 : 1,
         ),
       ),
@@ -47,42 +43,30 @@ class SensorCard extends StatelessWidget {
         children: [
           Row(
             children: [
-              Icon(icon, color: color, size: 14),
+              Icon(icon, color: color, size: 16),
               const SizedBox(width: 6),
-              Text(
-                label.toUpperCase(),
-                style: AppTextStyles.labelMono,
+              Expanded(
+                child: Text(label, style: AppTextStyles.labelMono, overflow: TextOverflow.ellipsis),
               ),
-              if (isAlert) ...[
-                const Spacer(),
+              if (isAlert)
                 Container(
                   width: 6,
                   height: 6,
-                  decoration: const BoxDecoration(
-                    color: AppTheme.danger,
-                    shape: BoxShape.circle,
-                  ),
+                  decoration: const BoxDecoration(color: AppTheme.danger, shape: BoxShape.circle),
                 ),
-              ],
             ],
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 10),
           Row(
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
-              Text(
-                value,
-                style: AppTextStyles.valueSmall.copyWith(color: color),
-              ),
+              Text(value, style: AppTextStyles.valueSmall.copyWith(color: color)),
               const SizedBox(width: 4),
               Padding(
                 padding: const EdgeInsets.only(bottom: 2),
                 child: Text(
                   unit,
-                  style: AppTextStyles.labelMono.copyWith(
-                    color: color.withValues(alpha: 0.6),
-                    fontSize: 10,
-                  ),
+                  style: AppTextStyles.labelMono.copyWith(color: color.withValues(alpha: 0.7), fontSize: 10),
                 ),
               ),
             ],
@@ -93,13 +77,9 @@ class SensorCard extends StatelessWidget {
   }
 }
 
-
-// ─────────────────────────────────────────────
-// widgets/health_gauge.dart
-// ─────────────────────────────────────────────
-
+/// Gauge circulaire de santé, comme sur l'écran "Détail machine".
 class HealthGauge extends StatelessWidget {
-  final double healthScore; // 0.0 → 1.0
+  final double healthScore;
   final double failureProbability;
   final int rulDays;
   final double size;
@@ -113,7 +93,7 @@ class HealthGauge extends StatelessWidget {
   });
 
   Color get _gaugeColor {
-    if (healthScore >= 0.75) return AppTheme.accent;
+    if (healthScore >= 0.75) return AppTheme.success;
     if (healthScore >= 0.50) return AppTheme.warning;
     return AppTheme.danger;
   }
@@ -128,10 +108,7 @@ class HealthGauge extends StatelessWidget {
         children: [
           CustomPaint(
             size: Size(size, size),
-            painter: _GaugePainter(
-              value: healthScore,
-              color: _gaugeColor,
-            ),
+            painter: _GaugePainter(value: healthScore, color: _gaugeColor),
           ),
           Column(
             mainAxisSize: MainAxisSize.min,
@@ -142,30 +119,16 @@ class HealthGauge extends StatelessWidget {
                   fontSize: size * 0.22,
                   fontWeight: FontWeight.w800,
                   color: _gaugeColor,
-                  fontFamily: 'Courier',
                   letterSpacing: -1,
                 ),
               ),
+              Text('Santé', style: AppTextStyles.labelMono.copyWith(fontSize: 10)),
+              const SizedBox(height: 4),
               Text(
-                'SANTÉ',
-                style: AppTextStyles.labelMono.copyWith(fontSize: 9),
-              ),
-              const SizedBox(height: 8),
-              Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                decoration: BoxDecoration(
-                  color: AppTheme.surface,
-                  borderRadius: BorderRadius.circular(4),
-                  border: Border.all(color: AppTheme.border),
-                ),
-                child: Text(
-                  'RUL: $rulDays j',
-                  style: AppTextStyles.labelMono.copyWith(
-                    color: AppTheme.textPrimary,
-                    fontSize: 9,
-                  ),
-                ),
+                failureProbability >= 0.7 ? 'Risque très élevé'
+                    : failureProbability >= 0.4 ? 'Risque élevé'
+                    : 'Risque faible',
+                style: TextStyle(color: _gaugeColor, fontSize: 11, fontWeight: FontWeight.w700),
               ),
             ],
           ),
@@ -185,160 +148,26 @@ class _GaugePainter extends CustomPainter {
   void paint(Canvas canvas, Size size) {
     final center = Offset(size.width / 2, size.height / 2);
     final radius = size.width / 2 - 12;
-    const startAngle = 2.35; // ~135°
-    const sweepTotal = 4.71; // ~270°
+    const startAngle = 2.35;
+    const sweepTotal = 4.71;
 
-    // Track
     final trackPaint = Paint()
       ..color = AppTheme.border
       ..strokeWidth = 10
       ..style = PaintingStyle.stroke
       ..strokeCap = StrokeCap.round;
 
-    canvas.drawArc(
-      Rect.fromCircle(center: center, radius: radius),
-      startAngle,
-      sweepTotal,
-      false,
-      trackPaint,
-    );
+    canvas.drawArc(Rect.fromCircle(center: center, radius: radius), startAngle, sweepTotal, false, trackPaint);
 
-    // Progress
     final progressPaint = Paint()
       ..color = color
       ..strokeWidth = 10
       ..style = PaintingStyle.stroke
       ..strokeCap = StrokeCap.round;
 
-    canvas.drawArc(
-      Rect.fromCircle(center: center, radius: radius),
-      startAngle,
-      sweepTotal * value,
-      false,
-      progressPaint,
-    );
-
-    // Glow
-    final glowPaint = Paint()
-      ..color = color.withValues(alpha: 0.2)
-      ..strokeWidth = 18
-      ..style = PaintingStyle.stroke
-      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 6);
-
-    canvas.drawArc(
-      Rect.fromCircle(center: center, radius: radius),
-      startAngle,
-      sweepTotal * value,
-      false,
-      glowPaint,
-    );
+    canvas.drawArc(Rect.fromCircle(center: center, radius: radius), startAngle, sweepTotal * value, false, progressPaint);
   }
 
   @override
-  bool shouldRepaint(_GaugePainter old) =>
-      old.value != value || old.color != color;
-}
-
-
-// ─────────────────────────────────────────────
-// widgets/status_badge.dart
-// ─────────────────────────────────────────────
-
-class StatusBadge extends StatefulWidget {
-  final MotorStatus status;
-  final bool animate;
-
-  const StatusBadge({
-    super.key,
-    required this.status,
-    this.animate = true,
-  });
-
-  @override
-  State<StatusBadge> createState() => _StatusBadgeState();
-}
-
-class _StatusBadgeState extends State<StatusBadge>
-    with SingleTickerProviderStateMixin {
-  late AnimationController _controller;
-  late Animation<double> _pulse;
-
-  @override
-  void initState() {
-    super.initState();
-    _controller = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 1200),
-    );
-    _pulse = Tween<double>(begin: 0.6, end: 1.0).animate(
-      CurvedAnimation(parent: _controller, curve: Curves.easeInOut),
-    );
-
-    if (widget.animate &&
-        (widget.status == MotorStatus.critical ||
-            widget.status == MotorStatus.warning)) {
-      _controller.repeat(reverse: true);
-    }
-  }
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  (Color, Color, String) get _config => switch (widget.status) {
-    MotorStatus.healthy => (AppTheme.accent, AppTheme.accentDim, 'OPÉRATIONNEL'),
-    MotorStatus.warning => (AppTheme.warning, AppTheme.warningDim, 'ATTENTION'),
-    MotorStatus.critical => (AppTheme.danger, AppTheme.dangerDim, 'CRITIQUE'),
-    MotorStatus.offline => (AppTheme.textMuted, AppTheme.surface, 'HORS LIGNE'),
-  };
-
-  @override
-  Widget build(BuildContext context) {
-    final (fg, bg, label) = _config;
-
-    return AnimatedBuilder(
-      animation: _pulse,
-      builder: (_, child) => Opacity(
-        opacity: widget.animate &&
-                (widget.status == MotorStatus.critical ||
-                    widget.status == MotorStatus.warning)
-            ? _pulse.value
-            : 1.0,
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-          decoration: BoxDecoration(
-            color: bg,
-            borderRadius: BorderRadius.circular(4),
-            border: Border.all(color: fg.withValues(alpha: 0.5)),
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(
-                width: 6,
-                height: 6,
-                decoration: BoxDecoration(
-                  color: fg,
-                  shape: BoxShape.circle,
-                  boxShadow: [
-                    BoxShadow(color: fg.withValues(alpha: 0.5), blurRadius: 4),
-                  ],
-                ),
-              ),
-              const SizedBox(width: 6),
-              Text(
-                label,
-                style: AppTextStyles.labelMono.copyWith(
-                  color: fg,
-                  fontSize: 10,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
+  bool shouldRepaint(_GaugePainter old) => old.value != value || old.color != color;
 }

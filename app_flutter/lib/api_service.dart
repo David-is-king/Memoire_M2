@@ -133,6 +133,68 @@ class ApiService {
         )
         .timeout(_timeout);
   }
+
+  // ── Interventions ─────────────────────────────
+  // NOTE: ces endpoints supposent un backend exposant
+  // GET/PATCH /interventions. Si non encore implémenté côté
+  // FastAPI, getInterventions() renverra une exception gérée
+  // par l'écran (fallback affiché à l'utilisateur).
+
+  Future<List<InterventionModel>> getInterventions() async {
+    final response = await _client
+        .get(Uri.parse('$baseUrl/interventions'), headers: _headers)
+        .timeout(_timeout);
+
+    if (response.statusCode == 200) {
+      final List<dynamic> data = jsonDecode(response.body);
+      return data.map((j) => InterventionModel.fromJson(j)).toList();
+    }
+    throw ApiException('Erreur chargement interventions: ${response.statusCode}');
+  }
+
+  Future<InterventionModel> getInterventionById(String id) async {
+    final response = await _client
+        .get(Uri.parse('$baseUrl/interventions/$id'), headers: _headers)
+        .timeout(_timeout);
+
+    if (response.statusCode == 200) {
+      return InterventionModel.fromJson(jsonDecode(response.body));
+    }
+    throw ApiException('Intervention introuvable: $id');
+  }
+
+  Future<void> updateInterventionStatus(String id, InterventionStatus status) async {
+    await _client
+        .patch(
+          Uri.parse('$baseUrl/interventions/$id'),
+          headers: _headers,
+          body: jsonEncode({'status': status.name}),
+        )
+        .timeout(_timeout);
+  }
+
+  Future<void> updateInterventionProgress(String id, double progress, {String? currentStep}) async {
+    await _client
+        .patch(
+          Uri.parse('$baseUrl/interventions/$id/progress'),
+          headers: _headers,
+          body: jsonEncode({
+            'progress': progress,
+            if (currentStep != null) 'current_step': currentStep,
+          }),
+        )
+        .timeout(_timeout);
+  }
+
+  Future<void> addInterventionNote(String id, String note) async {
+    await _client
+        .post(
+          Uri.parse('$baseUrl/interventions/$id/notes'),
+          headers: _headers,
+          body: jsonEncode({'note': note}),
+        )
+        .timeout(_timeout);
+  }
 }
 
 class ApiException implements Exception {
