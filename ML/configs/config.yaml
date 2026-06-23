@@ -1,20 +1,22 @@
-# configs/config.yaml
+# fichier yaml plan directeur du projet industriel de maintenance prédictive pour des moteurs électriques
 
+
+# Métadonnées du Projet
 project:
   name: predictive_maintenance
   version: "1.0.0"
   description: "Predictive maintenance for electric motors - ESP32 sensors"
 
-# ── Paths ─────────────────────────────────────────────────
+# Structure des Dossiers
 paths:
-  data_raw:       data/raw
-  data_processed: data/processed
+  data_raw:       data/raw                # datasets données brutes jamais modifiées
+  data_processed: data/processed          # Données après nettoyage
   data_features:  data/features
   models:         models/artifacts
   registry:       models/registry
   logs:           logs
 
-# ── Data sources (datasets publics) ───────────────────────
+# datasets. Avant de déployer de vrais capteurs, on entraîne les algorithmes sur des données historiques
 datasets:
   cwru:
     name: "CWRU Bearing Dataset"
@@ -35,7 +37,7 @@ datasets:
     sampling_rate: 50000   # Hz
     sensors: [vibration_x, vibration_y, vibration_z, acoustic, current]
 
-# ── ESP32 Sensor Config (pour quand les capteurs seront prêts) ──
+# Configuration des capteurs de l'ESP32
 esp32:
   sampling_rate_hz: 100
   sensors:
@@ -43,37 +45,38 @@ esp32:
       pin: 4
       unit: celsius
       range: [-10, 200]
-      alert_threshold: 85
+      alert_threshold: 85 #Alerte si > 85°C
     vibration:
       pin: 34
-      unit: g            # accéléromètre ADXL345
+      unit: g            
       range: [-16, 16]
-      alert_threshold: 5.0
+      alert_threshold: 5.0 # Accéléromètre ADXL345, alerte si > 5.0g
     current:
       pin: 35
-      unit: ampere       # capteur ACS712
+      unit: ampere       
       range: [0, 30]
-      alert_threshold: 25
+      alert_threshold: 25 # Capteur ACS712 pour détecter les surcharges, alerte si > 25A
     voltage:
       pin: 32
       unit: volt
       range: [0, 250]
     acoustic:
       pin: 33
-      unit: db           # microphone MAX4466
+      unit: db           
       range: [30, 120]
-      alert_threshold: 90
+      alert_threshold: 90 # Tension (Volt) et Acoustique (Microphone pour capter les bruits suspects de friction, alerte si > 90 dB)
   mqtt:
     broker: "localhost"
     port: 1883
     topic: "sensors/motor/{motor_id}/readings"
   websocket:
     host: "0.0.0.0"
-    port: 8765
+    port: 8765                #Communication mqtt (a revoir et utiliser kafka) Protocole pour envoyer les mesures en temps réel vers un serveur (broker).
+    #websocket : Permet une communication bidirectionnelle ultra-rapide (pour un affichage en direct sur une interface web)
 
-# ── Cleaning pipeline ─────────────────────────────────────
+# Pipeline de Nettoyage des Données
 cleaning:
-  level1:   # Raw cleaning
+  level1:   #Nettoyage brut
     drop_duplicates: true
     timestamp_tolerance_ms: 100
     physical_bounds:
@@ -82,20 +85,20 @@ cleaning:
       current:      [-5, 100]
       voltage:      [0, 500]
       acoustic_db:  [0, 140]
-    null_strategy: flag    # flag | drop | interpolate
+    null_strategy: flag    
 
-  level2:   # Structural
-    resample_hz: 100       # uniformiser à 100 Hz
+  level2:   # Harmonisation structurelle
+    resample_hz: 100       
     interpolation_method: linear
     max_gap_seconds: 5     # ne pas interpoler les gaps > 5s
     align_tolerance_ms: 50
 
-  level3:   # Feature engineering
-    window_sizes: [128, 256, 512, 1024]   # échantillons
+  level3:   # Préparation au calcul
+    window_sizes: [128, 256, 512, 1024]   
     overlap: 0.5
     fft_bins: 512
 
-# ── Feature Engineering ───────────────────────────────────
+# Feature Engineering
 features:
   time_domain:
     - rms
@@ -130,7 +133,7 @@ features:
     windows_seconds: [10, 60, 300]
     stats: [mean, std, max, min]
 
-# ── Models ────────────────────────────────────────────────
+# Models
 models:
   anomaly_detection:
     name: isolation_forest
@@ -166,7 +169,7 @@ models:
     voting: soft
     weights: [0.2, 0.4, 0.4]   # [isolation_forest, random_forest, lstm]
 
-# ── Training ──────────────────────────────────────────────
+# Training
 training:
   test_size: 0.2
   val_size: 0.1
@@ -177,20 +180,20 @@ training:
     tracking_uri: "http://localhost:5000"
     experiment_name: "predictive_maintenance"
 
-# ── Thresholds (classification finale) ───────────────────
+# Thresholds (classification finale)
 thresholds:
   healthy:  { max_failure_prob: 0.30, min_health_score: 70 }
   warning:  { max_failure_prob: 0.65, min_health_score: 40 }
   critical: { failure_prob_min: 0.65 }
 
-# ── API ───────────────────────────────────────────────────
+# API
 api:
   host: "0.0.0.0"
   port: 8000
   workers: 4
   reload: false
 
-# ── Monitoring / Auto-retrain ──────────────────────────────
+# Monitoring / Auto-retrain
 monitoring:
   drift_detection: true
   drift_threshold: 0.15     # PSI > 0.15 → drift significatif

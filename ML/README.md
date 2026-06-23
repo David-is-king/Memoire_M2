@@ -1,75 +1,72 @@
-# 🔧 Predictive Maintenance — Moteurs Électriques
+# Predictive Maintenance — Moteurs Électriques
 
 Système de maintenance prédictive complet :
-**Datasets publics → Nettoyage 3 niveaux → Modèles ML → API FastAPI → App Flutter**
+**Datasets publics -> Nettoyage 3 niveaux -> Modèles ML -> API FastAPI -> App Flutter**
 
 Compatible ESP32 dès que les capteurs seront prêts (changement de source uniquement).
 
----
-
-## 📁 Structure du projet
+# Structure du projet
 
 ```
 predictive_maintenance/
 │
 ├── configs/
-│   └── config.yaml                 ← Tous les paramètres centralisés
+│   └── config.yaml                 <- Tous les paramètres centralisés
 │
 ├── data/
-│   ├── raw/                        ← Datasets bruts (CWRU, NASA, synthétique)
-│   ├── processed/                  ← Après nettoyage L1 + L2
-│   └── features/                   ← Features ML-ready (L3)
+│   ├── raw/                        <- Datasets bruts (CWRU, NASA, synthétique)
+│   ├── processed/                  <- Après nettoyage L1 + L2
+│   └── features/                   <- Features ML-ready (L3)
 │
 ├── src/
 │   ├── ingestion/
-│   │   └── dataset_loader.py       ← Charge CWRU / NASA IMS / MAFAULDA / synthétique
+│   │   └── dataset_loader.py       <- Charge CWRU / NASA IMS / MAFAULDA / synthétique
 │   │
 │   ├── cleaning/
-│   │   └── pipeline.py             ← Pipeline 3 niveaux
-│   │       ├── Level1Cleaner       → Nettoyage brut (bounds, doublons, nulls)
-│   │       ├── Level2Cleaner       → Structuration (resample, interpolation)
-│   │       ├── Level3FeatureEng.   → Feature engineering (FFT, kurtosis, THD...)
-│   │       └── CleaningPipeline    → Orchestrateur (batch + streaming)
+│   │   └── pipeline.py             <- Pipeline 3 niveaux
+│   │       ├── Level1Cleaner       -> Nettoyage brut (bounds, doublons, nulls)
+│   │       ├── Level2Cleaner       -> Structuration (resample, interpolation)
+│   │       ├── Level3FeatureEng.   -> Feature engineering (FFT, kurtosis, THD...)
+│   │       └── CleaningPipeline    -> Orchestrateur (batch + streaming)
 │   │
 │   ├── training/
-│   │   └── trainer.py              ← Entraînement des 3 modèles
-│   │       ├── IsolationForest     → Détection anomalies
-│   │       ├── RandomForest        → Classification (Normal/Warning/Critical)
-│   │       └── LSTM + Attention    → Prédiction RUL (jours restants)
+│   │   └── trainer.py              <- Entraînement des 3 modèles
+│   │       ├── IsolationForest     -> Détection anomalies
+│   │       ├── RandomForest        -> Classification (Normal/Warning/Critical)
+│   │       └── LSTM + Attention    -> Prédiction RUL (jours restants)
 │   │
 │   ├── inference/
-│   │   └── predictor.py            ← Prédiction temps réel (batch + streaming)
+│   │   └── predictor.py            <- Prédiction temps réel (batch + streaming)
 │   │
 │   ├── simulator/
-│   │   └── esp32_simulator.py      ← Rejoue les datasets comme l'ESP32 réel
-│   │       ├── ESP32Simulator      → WebSocket + MQTT publisher
-│   │       └── StreamingPipeline   → Connecte simulator → pipeline → API
+│   │   └── esp32_simulator.py      <- Rejoue les datasets comme l'ESP32 réel
+│   │       ├── ESP32Simulator      -> WebSocket + MQTT publisher
+│   │       └── StreamingPipeline   -> Connecte simulator → pipeline → API
 │   │
 │   ├── monitoring/
-│   │   └── drift_monitor.py        ← Détection drift (PSI + KS) + auto-retrain
+│   │   └── drift_monitor.py        <- Détection drift (PSI + KS) + auto-retrain
 │   │
 │   └── api/
-│       └── main.py                 ← FastAPI (REST + WebSocket pour Flutter)
+│       └── main.py                 <- FastAPI (REST + WebSocket pour Flutter)
 │
 ├── models/
-│   ├── artifacts/                  ← Modèles entraînés (.pkl, .pt)
-│   └── registry/                   ← Métriques par version
+│   ├── artifacts/                  <- Modèles entraînés (.pkl, .pt)
+│   └── registry/                   <- Métriques par version
 │
 ├── scripts/
-│   └── run_pipeline.py             ← Script principal tout-en-un
+│   └── run_pipeline.py             <- Script principal tout-en-un
 │
 ├── tests/
 ├── requirements.txt
 └── configs/config.yaml
 ```
 
----
 
-## 🚀 Démarrage rapide
+# Démarrage
 
 ### 1. Installation
 ```bash
-cd predictive_maintenance
+
 python -m venv .venv
 source .venv/bin/activate          # Windows: .venv\Scripts\activate
 pip install -r requirements.txt
@@ -90,7 +87,7 @@ Rejoue les données à 50× la vitesse réelle → prédictions en temps réel.
 ### 4. API FastAPI
 ```bash
 python scripts/run_pipeline.py --mode api
-# → http://localhost:8000/docs
+# http://localhost:8000/docs
 ```
 
 ### 5. Tout en même temps
@@ -98,30 +95,29 @@ python scripts/run_pipeline.py --mode api
 python scripts/run_pipeline.py --mode full --tune --motors 20
 ```
 
----
 
-## 🧹 Pipeline Nettoyage 3 Niveaux
+## Pipeline Nettoyage 3 Niveaux
 
-| Niveau | Classe | Opérations |
-|--------|--------|-----------|
-| **L1** | `Level1Cleaner` | Doublons, bounds physiques, NaN, outliers 6σ |
-| **L2** | `Level2Cleaner` | Rééchantillonnage 100Hz, interpolation, alignement |
+| Niveau | Classe                  | Opérations 
+|--------|-------------------------|-------------------------------------------------------|
+| **L1** | `Level1Cleaner`         | Doublons, bounds physiques, NaN, outliers 6σ          |
+| **L2** | `Level2Cleaner`         | Rééchantillonnage 100Hz, interpolation, alignement    |
 | **L3** | `Level3FeatureEngineer` | RMS, Kurtosis, FFT, THD, rolling stats, cross-sensors |
 
----
 
-## 🤖 Modèles
 
-| Modèle | Type | Cible |
-|--------|------|-------|
-| **Isolation Forest** | Non supervisé | Détection anomalies |
-| **Random Forest** | Classification | Normal / Warning / Critical |
-| **LSTM + Attention** | Régression temporelle | RUL (jours restants) |
-| **Ensemble** | Soft voting | HealthScore final (0–100) |
+## Modèles
 
----
+| Modèle               | Type                  | Cible 
+|----------------------|-----------------------|-----------------------------
+| **Isolation Forest** | Non supervisé         | Détection anomalies         |
+| **Random Forest**    | Classification        | Normal / Warning / Critical |
+| **LSTM + Attention** | Régression temporelle | RUL (jours restants)        |
+| **Ensemble**         | Soft voting           | HealthScore final (0–100)   |
 
-## 🔌 Intégration ESP32 (quand prêt)
+
+
+## Intégration ESP32
 
 Le simulateur et le vrai ESP32 utilisent **la même interface**.
 
@@ -152,33 +148,32 @@ http.POST(payload);
 
 ---
 
-## 📊 API Endpoints
+## API Endpoints
 
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| GET | `/api/v1/devices` | Liste tous les moteurs |
-| GET | `/api/v1/devices/{id}` | Détail d'un moteur |
-| GET | `/api/v1/predictions/{id}` | Dernière prédiction |
-| POST | `/api/v1/ingest` | **Recevoir données ESP32** |
-| GET | `/api/v1/alerts` | Liste des alertes |
-| WS | `/ws/all` | Updates temps réel → Flutter |
-| WS | `/ws/devices/{id}` | Updates moteur spécifique |
+| Method | Endpoint                  | Description |
+|--------|---------------------------|-------------|
+| GET    | `/api/v1/devices`         | Liste tous les moteurs |
+| GET    | `/api/v1/devices/{id}`    | Détail d'un moteur |
+| GET    | `/api/v1/predictions/{id}`| Dernière prédiction |
+| POST   | `/api/v1/ingest`          | **Recevoir données ESP32** |
+| GET    | `/api/v1/alerts`          | Liste des alertes |
+| WS     | `/ws/all`                 | Updates temps réel → Flutter |
+| WS     | `/ws/devices/{id}`        | Updates moteur spécifique |
 
 ---
 
-## 🔄 Auto-retrain (drift monitoring)
+## Auto-retrain (drift monitoring)
 
 Le `DriftMonitor` surveille en continu :
-- **PSI < 0.10** → ✅ Pas de drift
-- **PSI 0.10–0.25** → ⚠️ Drift mineur (log)
-- **PSI > 0.25** → 🚨 Drift majeur → auto-retrain déclenché
+- **PSI < 0.10** → Pas de drift
+- **PSI 0.10–0.25** → Drift mineur (log)
+- **PSI > 0.25** → Drift majeur → auto-retrain déclenché
 
 ---
 
-## 📈 MLflow Tracking
+## MLflow Tracking
 
 ```bash
 mlflow server --host 0.0.0.0 --port 5000
-# → http://localhost:5000
+# http://localhost:5000
 ```
-Puis lancer l'entraînement → toutes les métriques sont loguées automatiquement.
