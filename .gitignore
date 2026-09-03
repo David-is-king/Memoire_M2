@@ -1,0 +1,30 @@
+# datasets
+ML/data/raw/
+ML/data/raw/**
+ML/data/raw/cwru/
+ML/data/raw/mafaulda/
+ML/data/processed/
+ML/data/features/
+ML/logs/
+
+# archives
+*.zip
+*.rar
+*.7z
+
+# matlab
+*.mat
+
+# gros csv
+*.csv
+
+# modèles IA
+models/
+*.pth
+*.pt
+*.h5
+
+# python
+__pycache__/
+*.pyc
+.venv/
