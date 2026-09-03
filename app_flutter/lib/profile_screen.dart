@@ -6,6 +6,7 @@
 import 'package:flutter/material.dart';
 import 'app_theme.dart';
 import 'login_screen.dart';
+import 'current_user.dart';
 
 class ProfileScreen extends StatelessWidget {
   const ProfileScreen({super.key});
@@ -27,12 +28,11 @@ class ProfileScreen extends StatelessWidget {
                   child: Icon(Icons.engineering_rounded, color: Colors.white, size: 36),
                 ),
                 const SizedBox(height: 12),
-                const Text('Julien Martin', style: AppTextStyles.headingMedium),
+                Text(CurrentUser.displayName, style: AppTextStyles.headingMedium),
                 const SizedBox(height: 2),
-                Text('Technicien de maintenance', style: AppTextStyles.labelMono.copyWith(fontSize: 12)),
+                Text(CurrentUser.roleLabel, style: AppTextStyles.labelMono.copyWith(fontSize: 12)),
                 const SizedBox(height: 8),
-                Text('julien.martin@exemple.com', style: AppTextStyles.bodyText.copyWith(fontSize: 12)),
-                Text('+33 6 12 34 56 78', style: AppTextStyles.bodyText.copyWith(fontSize: 12)),
+                Text(CurrentUser.email ?? '', style: AppTextStyles.bodyText.copyWith(fontSize: 12)),
               ],
             ),
           ),
@@ -47,6 +47,7 @@ class ProfileScreen extends StatelessWidget {
             label: 'Déconnexion',
             color: AppTheme.danger,
             onTap: () {
+              CurrentUser.clear();
               Navigator.pushAndRemoveUntil(
                 context,
                 MaterialPageRoute(builder: (_) => const LoginScreen()),

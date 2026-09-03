@@ -13,6 +13,7 @@ import 'app_theme.dart';
 import 'status_badge.dart';
 import 'motor_detail_screen.dart';
 import 'alerts_screen.dart';
+import 'current_user.dart';
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
@@ -170,17 +171,17 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 child: Icon(Icons.person, color: Colors.white, size: 20),
               ),
               const SizedBox(width: 10),
-              const Expanded(
+              Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('Bonjour, Julien',
+                    Text('Bonjour, ${CurrentUser.firstName}',
                         style: TextStyle(
                             color: Colors.white,
                             fontSize: 15,
                             fontWeight: FontWeight.w600)),
-                    Text('Technicien',
-                        style: TextStyle(color: Colors.white70, fontSize: 11)),
+                    Text(CurrentUser.roleLabel,
+                        style: const TextStyle(color: Colors.white70, fontSize: 11)),
                   ],
                 ),
               ),

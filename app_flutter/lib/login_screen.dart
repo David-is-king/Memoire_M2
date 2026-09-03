@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'api_service.dart';
 import 'app_theme.dart';
 import 'main_shell.dart';
+import 'top_toast.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -25,33 +26,30 @@ class _LoginScreenState extends State<LoginScreen> {
   void _handleLogin() async {
     if (_emailController.text.trim().isEmpty ||
         _passwordController.text.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Veuillez remplir tous les champs')),
-      );
+      showTopToast(context, 'Veuillez remplir tous les champs');
       return;
     }
 
-// affichage du chargement
     setState(() => _isLoading = true);
 
-// Envoie de l'email et du mot de passe à ton API et attend la réponse (true ou false)
-    final success = await _apiService.login(
-      _emailController.text.trim(),
-      _passwordController.text,
-    );
-
-    setState(() => _isLoading = false);
-
-    if (success && mounted) {
-      // Si la connexion réussit l'application bascule vers MainShell et supprime l'écran de connexion de l'historique pour éviter que l'utilisateur ne revienne en arrière en cliquant sur le bouton retour
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (_) => const MainShell()),
+    try {
+      await _apiService.login(
+        _emailController.text.trim(),
+        _passwordController.text,
       );
-    } else if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Email ou mot de passe incorrect')),
-      );
+
+      if (mounted) {
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (_) => const MainShell()),
+        );
+      }
+    } on ApiException catch (e) {
+      if (mounted) showTopToast(context, e.message);
+    } catch (_) {
+      if (mounted) showTopToast(context, 'Impossible de contacter le serveur');
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 
@@ -92,9 +90,15 @@ class _LoginScreenState extends State<LoginScreen> {
 
           // formulaire
           SafeArea(
-            child: SingleChildScrollView(
-              child: Column(
-                children: [
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                return SingleChildScrollView(
+                  child: ConstrainedBox(
+                    constraints: BoxConstraints(minHeight: constraints.maxHeight),
+                    child: Center(
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
                   const SizedBox(height: 40),
                   // Logo
                   Row(
@@ -324,8 +328,12 @@ class _LoginScreenState extends State<LoginScreen> {
                     ],
                   ),
                   const SizedBox(height: 24),
-                ],
-              ),
+                        ],
+                      ),
+                    ),
+                  ),
+                );
+              },
             ),
           ),
         ],

@@ -5,6 +5,7 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'sensor_data.dart';
+import 'current_user.dart';
 
 class ApiService {
   // URL REST du backend FastAPI.
@@ -27,17 +28,27 @@ class ApiService {
 
   // ── Auth ────────────────────────────────────
 
-  Future<bool> login(String email, String password) async {
-    try {
-      final response = await _client.post(
-        Uri.parse('$baseUrl/auth/login'),
-        headers: _headers,
-        body: jsonEncode({'email': email, 'password': password}),
-      ).timeout(_timeout);
-      return response.statusCode == 200;
-    } catch (e) {
-      return false;
+   Future<bool> login(String email, String password) async {
+    final response = await _client.post(
+      Uri.parse('$baseUrl/auth/login'),
+      headers: _headers,
+      body: jsonEncode({'email': email, 'password': password}),
+    ).timeout(_timeout);
+
+    final Map<String, dynamic> body = jsonDecode(response.body);
+
+    if (response.statusCode == 200) {
+      final user = body['user'] as Map<String, dynamic>;
+      CurrentUser.set(
+        id: user['id'] as String,
+        email: user['email'] as String,
+        fullName: user['full_name'] as String?,
+        role: user['role'] as String?,
+      );
+      return true;
     }
+
+    throw ApiException(body['detail'] as String? ?? 'Erreur de connexion');
   }
 
   // ── Motors ──────────────────────────────────
